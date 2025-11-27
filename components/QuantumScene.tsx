@@ -1,11 +1,12 @@
+
 /**
  * @license
  * SPDX-License-Identifier: Apache-2.0
 */
 
-import React, { useRef } from 'react';
+import React, { useRef, useMemo } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Float, MeshDistortMaterial, Sphere, Torus, Cylinder, Stars, Environment, Box } from '@react-three/drei';
+import { Float, MeshDistortMaterial, Sphere, Torus, Cylinder, Stars, Environment, Box, Line, Instance, Instances } from '@react-three/drei';
 import * as THREE from 'three';
 
 const QuantumParticle = ({ position, color, scale = 1 }: { position: [number, number, number]; color: string; scale?: number }) => {
@@ -143,4 +144,142 @@ export const QuantumComputerScene: React.FC = () => {
       </Canvas>
     </div>
   );
+}
+
+// --- ZEP NETWORK SCENE ---
+const NetworkNode = ({ position }: { position: THREE.Vector3 }) => {
+    return (
+        <mesh position={position}>
+            <sphereGeometry args={[0.1, 16, 16]} />
+            <meshBasicMaterial color="#3b82f6" transparent opacity={0.8} />
+        </mesh>
+    )
+}
+
+const Connection = ({ start, end }: { start: THREE.Vector3, end: THREE.Vector3 }) => {
+    const ref = useRef<any>(null);
+    useFrame((state) => {
+        if(ref.current?.material) {
+            ref.current.material.opacity = 0.3 + Math.sin(state.clock.getElapsedTime() * 2 + start.x) * 0.2;
+        }
+    })
+    
+    const points = useMemo(() => [start, end], [start, end]);
+
+    return (
+        <Line 
+            ref={ref} 
+            points={points} 
+            color="#60a5fa" 
+            transparent 
+            opacity={0.3} 
+            lineWidth={1} 
+        />
+    )
+}
+
+export const NetworkScene: React.FC = () => {
+    const nodeCount = 40;
+    const radius = 5;
+    
+    const nodes = useMemo(() => {
+        const temp = [];
+        for(let i=0; i<nodeCount; i++) {
+            const theta = Math.random() * Math.PI * 2;
+            const phi = Math.acos(2 * Math.random() - 1);
+            const r = radius * Math.cbrt(Math.random());
+            const x = r * Math.sin(phi) * Math.cos(theta);
+            const y = r * Math.sin(phi) * Math.sin(theta);
+            const z = r * Math.cos(phi);
+            temp.push(new THREE.Vector3(x, y, z));
+        }
+        return temp;
+    }, []);
+
+    const connections = useMemo(() => {
+        const conns = [];
+        for(let i=0; i<nodes.length; i++) {
+            for(let j=i+1; j<nodes.length; j++) {
+                if(nodes[i].distanceTo(nodes[j]) < 2.5) {
+                    conns.push([nodes[i], nodes[j]]);
+                }
+            }
+        }
+        return conns;
+    }, [nodes]);
+
+    return (
+        <div className="absolute inset-0 z-0 opacity-40 pointer-events-none">
+            <Canvas camera={{ position: [0, 0, 8], fov: 60 }}>
+                <ambientLight intensity={1} />
+                <Float speed={1} rotationIntensity={0.2} floatIntensity={0.2}>
+                    <group rotation={[0, 0, 0]}>
+                        {nodes.map((pos, i) => <NetworkNode key={i} position={pos} />)}
+                        {connections.map((pair, i) => <Connection key={`conn-${i}`} start={pair[0]} end={pair[1]} />)}
+                    </group>
+                </Float>
+                <Environment preset="city" />
+            </Canvas>
+        </div>
+    );
+};
+
+// --- DATA STREAM SCENE (DEEP RESEARCH) ---
+const StreamLine = ({ x, speed, height }: { x: number, speed: number, height: number }) => {
+    const ref = useRef<THREE.Mesh>(null);
+    useFrame((state) => {
+        if(ref.current) {
+            ref.current.position.y -= speed * 0.1;
+            if(ref.current.position.y < -height) {
+                ref.current.position.y = height;
+            }
+        }
+    })
+
+    return (
+        <mesh ref={ref} position={[x, height, 0]}>
+            <boxGeometry args={[0.05, 1, 0.05]} />
+            <meshBasicMaterial color="#a855f7" transparent opacity={0.5} />
+        </mesh>
+    )
+}
+
+export const DataStreamScene: React.FC = () => {
+    const streams = useMemo(() => {
+        return [...Array(20)].map(() => ({
+            x: (Math.random() - 0.5) * 10,
+            speed: 0.5 + Math.random(),
+            height: 5 + Math.random() * 5
+        }))
+    }, []);
+
+    return (
+        <div className="absolute inset-0 z-0 opacity-30 pointer-events-none bg-black">
+            <Canvas camera={{ position: [0, 0, 5], fov: 60 }}>
+                {streams.map((s, i) => (
+                    <StreamLine key={i} {...s} />
+                ))}
+            </Canvas>
+        </div>
+    )
+}
+
+// --- NEURAL GRID SCENE (AGENT-R) ---
+export const NeuralGridScene: React.FC = () => {
+    return (
+        <div className="absolute inset-0 z-0 opacity-40 pointer-events-none bg-stone-900">
+            <Canvas camera={{ position: [0, 2, 4], fov: 50 }}>
+                <ambientLight intensity={0.5} />
+                <gridHelper args={[20, 20, 0xf97316, 0x44403c]} />
+                <Float speed={2} rotationIntensity={0.5}>
+                    <Torus args={[1, 0.02, 16, 100]} rotation={[Math.PI/2, 0, 0]} position={[0, 1, 0]}>
+                         <meshBasicMaterial color="#f97316" transparent opacity={0.5} />
+                    </Torus>
+                     <Torus args={[1.5, 0.02, 16, 100]} rotation={[Math.PI/2, 0, 0]} position={[0, 1, 0]}>
+                         <meshBasicMaterial color="#f97316" transparent opacity={0.3} />
+                    </Torus>
+                </Float>
+            </Canvas>
+        </div>
+    )
 }
